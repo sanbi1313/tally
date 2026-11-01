@@ -350,6 +350,11 @@ impl Engine {
         iv
     }
 
+    /// "이전 기록은 통계에 남았어요" 안내를 지운다(그 기록을 삭제했을 때)
+    pub fn forget_prev(&mut self) {
+        self.prev_work_ms = None;
+    }
+
     pub fn kind(&self) -> Kind {
         self.kind
     }

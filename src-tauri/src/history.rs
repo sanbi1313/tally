@@ -38,6 +38,8 @@ pub struct SessionSummary {
     pub work_ms: u64,
     /// 작업한 프로그램(많이 한 순)
     pub apps: Vec<String>,
+    /// 지금 기록 중인 세션
+    pub current: bool,
 }
 
 #[derive(Debug, Clone, Serialize, PartialEq)]
@@ -97,6 +99,7 @@ pub fn day_detail(st: &Store, day: &str) -> R<DayDetail> {
                     end_ms: seg.end_ms,
                     work_ms: 0,
                     apps: Vec::new(),
+                    current: false,
                 });
                 per_app.push(Vec::new());
                 sessions.len() - 1
@@ -132,6 +135,30 @@ pub fn set_session_note(st: &Store, id: i64, note: Option<&str>) -> R<()> {
     st.conn().execute(
         "UPDATE sessions SET note = ?2 WHERE id = ?1",
         params![id, note.map(str::trim).filter(|n| !n.is_empty())],
+    )?;
+    Ok(())
+}
+
+/// 세션 하나의 기록을 지운다. 지운 구간 수
+pub fn delete_session(st: &Store, id: i64) -> R<usize> {
+    let n = st.conn().execute("DELETE FROM segments WHERE session_id = ?1", [id])?;
+    drop_empty_sessions(st)?;
+    Ok(n)
+}
+
+/// 그날 기록을 모두 지운다. 지운 구간 수
+pub fn delete_day(st: &Store, day: &str) -> R<usize> {
+    let n = st.conn().execute("DELETE FROM segments WHERE day = ?1", [day])?;
+    drop_empty_sessions(st)?;
+    Ok(n)
+}
+
+/// 구간이 하나도 안 남은 끝난 세션(메모 포함)을 지운다. 진행 중인 세션은 그대로
+fn drop_empty_sessions(st: &Store) -> R<()> {
+    st.conn().execute(
+        "DELETE FROM sessions WHERE ended_at IS NOT NULL
+           AND NOT EXISTS (SELECT 1 FROM segments g WHERE g.session_id = sessions.id)",
+        [],
     )?;
     Ok(())
 }
@@ -223,6 +250,33 @@ mod tests {
         st.push(&iv(d2, 2_000_000, 2_010_000, Kind::Other, None)).unwrap();
         st.end_session(2_010_000, None).unwrap();
         (st, a, b)
+    }
+
+    fn count(st: &Store, sql: &str) -> i64 {
+        st.conn().query_row(sql, [], |r| r.get(0)).unwrap()
+    }
+
+    #[test]
+    fn delete_session_removes_its_segments_and_row() {
+        let (st, ..) = seeded();
+        let id = day_detail(&st, "2026-11-01").unwrap().sessions[0].id;
+        assert_eq!(delete_session(&st, id).unwrap(), 3);
+        assert!(day_detail(&st, "2026-11-01").unwrap().sessions.is_empty());
+        // 다른 날·다른 세션은 그대로
+        assert_eq!(day_totals(&st, "2026-10-31", "2026-10-31").unwrap()[0].work_ms, 60_000);
+        assert_eq!(count(&st, "SELECT COUNT(*) FROM sessions"), 2);
+    }
+
+    #[test]
+    fn delete_day_keeps_other_days_and_open_session() {
+        let (mut st, ..) = seeded();
+        // 그날 기록 중인 세션(구간 없음)은 남는다
+        let open = st.start_session(3_000_000).unwrap();
+        assert_eq!(delete_day(&st, "2026-11-01").unwrap(), 4);
+        assert!(day_totals(&st, "2026-11-01", "2026-11-01").unwrap().is_empty());
+        assert_eq!(day_totals(&st, "2026-10-31", "2026-10-31").unwrap().len(), 1);
+        assert_eq!(count(&st, "SELECT COUNT(*) FROM sessions"), 2);
+        assert_eq!(count(&st, &format!("SELECT COUNT(*) FROM sessions WHERE id = {open}")), 1);
     }
 
     #[test]

@@ -684,7 +684,53 @@ fn history_days(core: State<Core>, from: String, to: String) -> Result<Vec<histo
 
 #[tauri::command]
 fn history_day(core: State<Core>, day: String) -> Result<history::DayDetail, String> {
-    with_flushed(&core, |st| history::day_detail(st, &day))
+    with_flushed(&core, |st| {
+        let mut d = history::day_detail(st, &day)?;
+        let cur = st.current_session();
+        d.sessions.iter_mut().for_each(|s| s.current = Some(s.id) == cur);
+        Ok(d)
+    })
+}
+
+/// 기록 삭제(잘못 누른 기록·테스트용). 지금 세션이 들어 있으면 먼저 닫고(시작 전으로) 지운다
+fn delete_history(app: &AppHandle, includes_current: impl Fn(&Store, i64) -> rusqlite::Result<bool>, del: impl FnOnce(&Store) -> rusqlite::Result<usize>) -> Result<usize, String> {
+    let core = app.state::<Core>();
+    let current = {
+        let mut st = core.store.lock().unwrap();
+        st.flush().map_err(err_str)?;
+        match st.current_session() {
+            Some(id) => includes_current(&st, id).map_err(err_str)?,
+            None => false,
+        }
+    };
+    if current {
+        core.restart_session(None);
+        core.engine.lock().unwrap().forget_prev();
+    }
+    let n = with_flushed(&core, del)?;
+    publish_now(app);
+    Ok(n)
+}
+
+#[tauri::command]
+fn delete_session(app: AppHandle, id: i64) -> Result<usize, String> {
+    delete_history(&app, |_, cur| Ok(cur == id), |st| history::delete_session(st, id))
+}
+
+#[tauri::command]
+fn delete_day(app: AppHandle, day: String) -> Result<usize, String> {
+    let d = day.clone();
+    delete_history(
+        &app,
+        move |st, cur| {
+            st.conn().query_row(
+                "SELECT EXISTS(SELECT 1 FROM segments WHERE session_id = ?1 AND day = ?2)",
+                rusqlite::params![cur, d],
+                |r| r.get(0),
+            )
+        },
+        |st| history::delete_day(st, &day),
+    )
 }
 
 #[tauri::command]
@@ -1357,6 +1403,8 @@ pub fn run() {
             set_alarm_sound,
             history_days,
             history_day,
+            delete_session,
+            delete_day,
             set_session_note,
             export_csv,
             set_theme,

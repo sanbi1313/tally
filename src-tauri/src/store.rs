@@ -320,6 +320,11 @@ impl Store {
 
     // ---- 세션 ----
 
+    /// 지금 기록 중인 세션
+    pub fn current_session(&self) -> Option<i64> {
+        self.session_id
+    }
+
     pub fn start_session(&mut self, now_ms: i64) -> R<i64> {
         self.conn.execute("INSERT INTO sessions (started_at) VALUES (?1)", [now_ms])?;
         let id = self.conn.last_insert_rowid();

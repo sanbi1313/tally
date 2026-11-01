@@ -145,6 +145,8 @@ export interface SessionSummary {
   endMs: number;
   workMs: number;
   apps: string[];
+  /** 지금 기록 중인 세션 */
+  current: boolean;
 }
 
 export interface DayDetail {

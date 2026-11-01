@@ -182,6 +182,13 @@ export const en: Dict = {
   "log.tapMonth": "Tap a bar to see that month",
   "log.export": "Export CSV",
   "log.exported": "Saved {n} rows",
+  "log.delete": "Delete",
+  "log.deleted": "Deleted",
+  "log.current": "In progress",
+  "log.deleteSessionAsk": "Delete this session's record? This can't be undone.",
+  "log.deleteCurrentAsk": "This session is in progress. Deleting it also resets the current session to 0 and stops it. This can't be undone.",
+  "log.deleteDay": "Delete this day",
+  "log.deleteDayAsk": "Delete all records for {date}? This can't be undone.",
 
   // 작은 타이머·테마·시작
   "mini.fold": "Fold into mini timer",
@@ -233,7 +240,7 @@ export const en: Dict = {
   "guide.tools.t": "Tools",
   "guide.tools.b": "Timer (presets or custom, e.g. 25 or 1:30), stopwatch (laps), alarm (repeat by weekday; no weekday = once).\nThey run separately from work tracking and still ring when the window is closed.",
   "guide.log.t": "History",
-  "guide.log.b": "Switch Day/Week/Month/Year and use ◀ ▶ to go back in time. Click the date in the middle to pick one.\nClick a bar or a date to go one level down (Year → Month → Day).\nIn the day view, click a session note to edit it. \"Export CSV\" saves the period you are viewing.",
+  "guide.log.b": "Switch Day/Week/Month/Year and use ◀ ▶ to go back in time. Click the date in the middle to pick one.\nClick a bar or a date to go one level down (Year → Month → Day).\nIn the day view, click a session note to edit it. \"Export CSV\" saves the period you are viewing.\nUse the trash button in the day view or \"Delete this day\" to remove records you didn't mean to keep (can't be undone).",
 
   "unit.min": "{n} min",
   "unit.hour": "{n} h",

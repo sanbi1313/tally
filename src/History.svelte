@@ -31,6 +31,8 @@
   let detail = $state<DayDetail | null>(null);
   let message = $state("");
   let editingNote = $state<number | null>(null);
+  // 삭제 확인: 세션 id 또는 "day"
+  let confirmDel = $state<number | "day" | null>(null);
   let dateInput = $state<HTMLInputElement | null>(null);
 
   function setView(v: ViewKind, r = ref) {
@@ -186,6 +188,18 @@
   });
   const axis = $derived([0, 6, 12, 18, 24].map((h) => String((startHour + h) % 24).padStart(2, "0")));
 
+  async function remove(target: number | "day") {
+    try {
+      if (target === "day") await invoke("delete_day", { day: ref });
+      else await invoke("delete_session", { id: target });
+      message = t("log.deleted");
+    } catch (e) {
+      message = String(e);
+    }
+    confirmDel = null;
+    load();
+  }
+
   async function saveNote(id: number, value: string) {
     await invoke("set_session_note", { id, note: value });
     editingNote = null;
@@ -293,8 +307,22 @@
             </button>
           {/if}
           <span class="num">{hms(s.workMs)}</span>
+          <button type="button" class="trash" aria-label={t("log.delete")} title={t("log.delete")} onclick={() => (confirmDel = confirmDel === s.id ? null : s.id)}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+              ><path d="M4 7h16M10 11v6M14 11v6M6 7l1 12a2 2 0 0 0 2 2h6a2 2 0 0 0 2-2l1-12M9 7V4h6v3" /></svg
+            >
+          </button>
         </div>
-        <span class="session-sub num">{D.hm(s.startMs)}–{D.hm(s.endMs)} · {s.apps.join(", ")}</span>
+        <span class="session-sub num">{#if s.current}<b class="cur">{t("log.current")}</b>{" · "}{/if}{D.hm(s.startMs)}–{D.hm(s.endMs)} · {s.apps.join(", ")}</span>
+        {#if confirmDel === s.id}
+          <div class="confirm">
+            <span>{s.current ? t("log.deleteCurrentAsk") : t("log.deleteSessionAsk")}</span>
+            <div class="confirm-btns">
+              <button type="button" class="ghost" onclick={() => (confirmDel = null)}>{t("today.cancel")}</button>
+              <button type="button" class="danger" onclick={() => remove(s.id)}>{t("log.delete")}</button>
+            </div>
+          </div>
+        {/if}
       </div>
     {:else}
       <div class="muted">{t("log.noSessions")}</div>
@@ -364,7 +392,19 @@
     </div>
   {/if}
 
+  {#if confirmDel === "day"}
+    <div class="confirm">
+      <span>{t("log.deleteDayAsk", { date: label })}</span>
+      <div class="confirm-btns">
+        <button type="button" class="ghost" onclick={() => (confirmDel = null)}>{t("today.cancel")}</button>
+        <button type="button" class="danger" onclick={() => remove("day")}>{t("log.delete")}</button>
+      </div>
+    </div>
+  {/if}
   <div class="export">
+    {#if view === "day" && detail?.segments.length}
+      <button type="button" class="text del-day" onclick={() => (confirmDel = confirmDel === "day" ? null : "day")}>{t("log.deleteDay")}</button>
+    {/if}
     {#if message}<span class="msg">{message}</span>{/if}
     <button type="button" class="text" onclick={exportCsv}>{t("log.export")}</button>
   </div>
@@ -548,6 +588,61 @@
   .muted {
     padding: 10px 0;
   }
+  .trash {
+    width: 28px;
+    height: 28px;
+    margin-right: -6px;
+    flex-shrink: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    border: none;
+    border-radius: 6px;
+    background: none;
+    color: var(--idle);
+  }
+  .trash:hover {
+    color: var(--accent);
+  }
+  .cur {
+    font-weight: 600;
+    color: var(--accent);
+  }
+  .confirm {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 6px;
+    padding: 10px 12px;
+    border: 1px solid var(--accent);
+    border-radius: 8px;
+    font-size: 14px;
+    line-height: 1.45;
+  }
+  .confirm-btns {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+  }
+  .confirm-btns button {
+    height: 30px;
+    padding: 0 14px;
+    border-radius: 6px;
+    font: inherit;
+    font-size: 14px;
+  }
+  .ghost {
+    border: 1px solid var(--line);
+    background: var(--surface);
+    color: var(--ink);
+  }
+  .danger {
+    border: 1px solid var(--accent);
+    background: var(--accent);
+    color: var(--on-accent);
+    font-weight: 600;
+  }
   /* 주·연 막대 */
   .bars {
     display: flex;
@@ -688,5 +783,11 @@
   }
   .text:hover {
     color: var(--ink);
+  }
+  .del-day {
+    margin-right: auto;
+  }
+  .del-day:hover {
+    color: var(--accent);
   }
 </style>

@@ -347,3 +347,16 @@
 | ErrMediaType (Rust) | 소리나 영상 파일만 열 수 있어요 | Only audio or video files can be opened | 音声または動画ファイルのみ開けます | 只能打开音频或视频文件 |
 | ErrMediaBig (Rust) | {mb}MB 이하 파일만 열 수 있어요 | Only files up to {mb} MB can be opened | {mb}MB 以下のファイルのみ開けます | 只能打开 {mb}MB 以下的文件 |
 | guide.alerts.b (덧붙임) | 소리 목록의 "파일에서 고르기…"로 mp3나 영상 파일을 열면 파형에서 원하는 구간(최대 60초)만 잘라 알림음으로 쓸 수 있어요. | Pick "Choose a file…" in a sound list to open an mp3 or video file and cut the part you want (up to 60 s) from its waveform as an alert sound. | 音のリストで「ファイルから選ぶ…」からmp3や動画ファイルを開くと、波形から好きな範囲（最大60秒）だけ切り取って通知音にできます。 | 在声音列表中点“从文件选择…”打开 mp3 或视频文件，可在波形上截取想要的片段（最长 60 秒）作为提示音。 |
+
+## 기록 삭제 (2026-11-01 추가·적용)
+
+| 키 | 한국어 | English | 日本語 | 中文(简体) |
+| --- | --- | --- | --- | --- |
+| log.delete | 삭제 | Delete | 削除 | 删除 |
+| log.deleted | 삭제했어요 | Deleted | 削除しました | 已删除 |
+| log.current | 진행 중 | In progress | 進行中 | 进行中 |
+| log.deleteSessionAsk | 이 세션 기록을 삭제할까요? 되돌릴 수 없어요. | Delete this session's record? This can't be undone. | このセッションの記録を削除しますか？元に戻せません。 | 删除此会话的记录？此操作无法撤销。 |
+| log.deleteCurrentAsk | 진행 중인 세션이에요. 삭제하면 지금 세션도 0으로 돌아가고 시작 전 상태가 돼요. 되돌릴 수 없어요. | This session is in progress. Deleting it also resets the current session to 0 and stops it. This can't be undone. | 進行中のセッションです。削除すると今のセッションも0に戻り、開始前の状態になります。元に戻せません。 | 这是正在进行的会话。删除后当前会话也会归零并回到未开始状态。此操作无法撤销。 |
+| log.deleteDay | 이 날 기록 삭제 | Delete this day | この日の記録を削除 | 删除当天记录 |
+| log.deleteDayAsk | {date} 기록을 모두 삭제할까요? 되돌릴 수 없어요. | Delete all records for {date}? This can't be undone. | {date} の記録をすべて削除しますか？元に戻せません。 | 删除 {date} 的全部记录？此操作无法撤销。 |
+| guide.log.b (덧붙임) | 하루 보기의 휴지통 단추나 "이 날 기록 삭제"로 잘못 남은 기록을 지울 수 있어요(되돌릴 수 없음). | Use the trash button in the day view or "Delete this day" to remove records you didn't mean to keep (can't be undone). | 日の表示のゴミ箱ボタンや「この日の記録を削除」で、間違えて残った記録を消せます（元に戻せません）。 | 可用日视图中的垃圾桶按钮或“删除当天记录”删除误留的记录（无法撤销）。 |
