@@ -172,6 +172,8 @@ export const ja: Dict = {
   "mini.close": "閉じる",
   "mini.chipWorking": "作業中、クリックで停止",
   "mini.chipStopped": "停止中、クリックで再開",
+  "mini.chipHint": "クリック: 停止/再開 · 右のボタン・ダブルクリック・右クリック: 展開",
+  "mini.expand": "展開",
   "general.mini": "ミニタイマー",
   "general.miniWork": "実作業",
   "general.miniElapsed": "経過",

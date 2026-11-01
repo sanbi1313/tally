@@ -174,7 +174,7 @@
     for (const s of detail.segments) {
       if (s.kind === "paused") continue;
       const bg = color(s);
-      const title = s.kind === "work" ? (s.label ?? "") : t(s.kind === "idle" ? "status.idle" : "status.other");
+      const title = s.kind === "work" ? (s.label ?? "") : t(s.kind === "idle" ? "status.idle" : s.kind === "break" ? "status.break" : "status.other");
       if (last && last.bg === bg && s.startMs - last.end < 2000) {
         out[out.length - 1].width = ((s.endMs - start) / span) * 100 - out[out.length - 1].left;
       } else {

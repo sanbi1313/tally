@@ -183,6 +183,8 @@ const ko = {
   "mini.close": "닫기",
   "mini.chipWorking": "작업 중, 눌러서 멈춤",
   "mini.chipStopped": "멈춤, 눌러서 재개",
+  "mini.chipHint": "한 번: 멈춤/재개 · 오른쪽 단추·두 번·우클릭: 펼치기",
+  "mini.expand": "펼치기",
   "general.mini": "작은 타이머",
   "general.miniWork": "실 작업",
   "general.miniElapsed": "경과",

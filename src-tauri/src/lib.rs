@@ -81,12 +81,18 @@ impl Core {
     fn view(&self) -> View {
         let snap = self.engine.lock().unwrap().snapshot();
         let alerts = self.alerts.lock().unwrap().clone();
-        let next_alert = self.scheduler.lock().unwrap().next_due(
+        let mut next_alert = self.scheduler.lock().unwrap().next_due(
             &alerts,
             snap.session_started_ms,
             snap.elapsed_ms,
             snap.work_ms,
         );
+        // 휴식이 끝나면 처음부터 다시 세므로, 휴식 중에는 한 주기를 그대로 보여 준다
+        if snap.kind == Kind::Break {
+            if let Some(n) = next_alert.as_mut() {
+                n.remaining_ms = n.every_min as u64 * 60_000;
+            }
+        }
         let break_remaining_ms = self
             .brk
             .lock()
@@ -130,8 +136,8 @@ impl Core {
         let mut st = self.store.lock().unwrap();
         Self::record(&mut st, iv);
         // 휴식 중 초기화: 휴식을 끝내고 새 세션을 바로 센다
-        if in_break && e.kind() == Kind::Paused {
-            let iv = e.toggle_pause(now);
+        if in_break {
+            let iv = e.set_break(now, false);
             Self::record(&mut st, iv);
         }
         let res = st.end_session(now, note).and_then(|_| st.start_session(now));
@@ -400,17 +406,17 @@ fn fire_alerts(app: &AppHandle, fired: &[AlertRow], view: &View) {
     };
     notify(app, title, body);
     sound::play(a.sound.clone(), a.volume);
-    if a.break_min > 0 && view.snap.kind != Kind::Paused {
+    if a.break_min > 0 && !matches!(view.snap.kind, Kind::Paused | Kind::Break) {
         start_break(app, a);
     }
 }
 
-/// 자동 휴식: 일시정지하고 끝나는 시각을 기억한다. 끝나면 루프가 end_break를 부른다.
+/// 자동 휴식: 실 작업만 멈추고(경과는 흐름) 끝나는 시각을 기억한다. 끝나면 루프가 end_break를 부른다.
 fn start_break(app: &AppHandle, a: &AlertRow) {
     let core = app.state::<Core>();
     {
         let mut e = core.engine.lock().unwrap();
-        let iv = e.toggle_pause(now_ms());
+        let iv = e.set_break(now_ms(), true);
         Core::record(&mut core.store.lock().unwrap(), iv);
     }
     *core.brk.lock().unwrap() = Some(Break {
@@ -421,17 +427,28 @@ fn start_break(app: &AppHandle, a: &AlertRow) {
     });
 }
 
-/// 휴식 시간이 다 되면 다시 센다. 휴식 끝 소리와 알림을 낸다.
+/// 휴식을 끝내고 실 작업을 다시 센다. 알림은 지금부터 다시 N분을 센다.
+/// 시간이 다 돼서 끝나면(sound=true) 휴식 끝 소리와 알림을 낸다.
+fn finish_break(app: &AppHandle) -> Option<Break> {
+    let core = app.state::<Core>();
+    let b = core.brk.lock().unwrap().take()?;
+    let snap = {
+        let mut e = core.engine.lock().unwrap();
+        let iv = e.set_break(now_ms(), false);
+        Core::record(&mut core.store.lock().unwrap(), iv);
+        e.snapshot()
+    };
+    let alerts = core.alerts.lock().unwrap().clone();
+    core.scheduler
+        .lock()
+        .unwrap()
+        .rearm(&alerts, snap.session_started_ms, snap.elapsed_ms, snap.work_ms);
+    Some(b)
+}
+
 fn end_break(app: &AppHandle) {
     let core = app.state::<Core>();
-    let Some(b) = core.brk.lock().unwrap().take() else { return };
-    {
-        let mut e = core.engine.lock().unwrap();
-        if e.kind() == Kind::Paused {
-            let iv = e.toggle_pause(now_ms());
-            Core::record(&mut core.store.lock().unwrap(), iv);
-        }
-    }
+    let Some(b) = finish_break(app) else { return };
     let lang = core.lang();
     notify(
         app,
@@ -748,8 +765,11 @@ async fn fold_to_mini(app: AppHandle) {
     }
 }
 
+/// 트레이 "작은 타이머": 접혀 있으면 펼치고, 펼쳐져 있으면 닫고, 없으면 연다
 fn toggle_mini(app: &AppHandle) {
+    let collapsed = app.state::<Core>().settings.lock().unwrap().mini.collapsed;
     match app.get_webview_window("mini") {
+        Some(_) if collapsed => show_mini(app),
         Some(w) => {
             let _ = w.destroy();
         }
@@ -757,21 +777,30 @@ fn toggle_mini(app: &AppHandle) {
     }
 }
 
+/// 작은 타이머를 연다. 이미 있으면 칩을 펼치고 앞으로 가져온다
 fn show_mini(app: &AppHandle) {
-    if app.get_webview_window("mini").is_some() {
+    let core = app.state::<Core>();
+    if core.settings.lock().unwrap().mini.collapsed {
+        save_settings(&core, |s| s.mini.collapsed = false);
+        let _ = app.emit(SETTINGS_EVENT, ());
+    }
+    if let Some(w) = app.get_webview_window("mini") {
         apply_mini(app);
+        let _ = w.unminimize();
+        let _ = w.show();
         return;
     }
-    let m = app.state::<Core>().settings.lock().unwrap().mini.clone();
+    let m = core.settings.lock().unwrap().mini.clone();
     let (w, h) = m.window_size();
+    // 작업 표시줄에도 보이게(본창과 구분되는 제목)
+    let title = format!("Tally · {}", i18n::t(&core.lang(), i18n::K::TrayMini));
     let built = WebviewWindowBuilder::new(app, "mini", WebviewUrl::default())
-        .title("Tally")
+        .title(title)
         .inner_size(w, h)
         .decorations(false)
         .transparent(true)
         .shadow(false)
         .resizable(false)
-        .skip_taskbar(true)
         .always_on_top(m.pinned)
         .focused(false)
         .visible(false)
@@ -924,7 +953,9 @@ fn ask_reset(app: &AppHandle) {
 fn do_toggle_pause(app: &AppHandle) -> View {
     let core = app.state::<Core>();
     // 휴식 중에 누르면 휴식을 끝내고 바로 다시 센다(소리 없이)
-    core.brk.lock().unwrap().take();
+    if finish_break(app).is_some() {
+        return publish_now(app);
+    }
     {
         let mut e = core.engine.lock().unwrap();
         let iv = e.toggle_pause(now_ms());
@@ -991,7 +1022,7 @@ fn status_text(lang: &str, view: &View) -> String {
         Kind::Work => i18n::tf(lang, K::StatusWork, &[("app", view.snap.app.as_deref().unwrap_or(""))]),
         Kind::Other => i18n::t(lang, K::StatusOther).into(),
         Kind::Idle => i18n::t(lang, K::StatusIdle).into(),
-        Kind::Paused if view.break_remaining_ms.is_some() => i18n::t(lang, K::StatusBreak).into(),
+        Kind::Break => i18n::t(lang, K::StatusBreak).into(),
         Kind::Paused => i18n::t(lang, K::StatusPaused).into(),
     }
 }

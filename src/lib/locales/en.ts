@@ -172,6 +172,8 @@ export const en: Dict = {
   "mini.close": "Close",
   "mini.chipWorking": "Working — click to pause",
   "mini.chipStopped": "Stopped — click to resume",
+  "mini.chipHint": "Click: pause/resume · Right button, double-click or right-click: expand",
+  "mini.expand": "Expand",
   "general.mini": "Mini timer",
   "general.miniWork": "Active",
   "general.miniElapsed": "Elapsed",

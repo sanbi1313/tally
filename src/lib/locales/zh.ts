@@ -172,6 +172,8 @@ export const zh: Dict = {
   "mini.close": "关闭",
   "mini.chipWorking": "工作中，点击暂停",
   "mini.chipStopped": "已停止，点击继续",
+  "mini.chipHint": "单击：暂停/继续 · 右侧按钮、双击或右键：展开",
+  "mini.expand": "展开",
   "general.mini": "迷你计时器",
   "general.miniWork": "实际工作",
   "general.miniElapsed": "经过",

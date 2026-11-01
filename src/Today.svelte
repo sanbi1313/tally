@@ -11,13 +11,7 @@
   let memo = $state("");
 
   const onBreak = $derived(snap.breakRemainingMs !== null);
-  const statusText = $derived(
-    snap.kind === "work"
-      ? t("status.work", { app: snap.app ?? "" })
-      : onBreak
-        ? t("status.break")
-        : t(`status.${snap.kind}`),
-  );
+  const statusText = $derived(snap.kind === "work" ? t("status.work", { app: snap.app ?? "" }) : t(`status.${snap.kind}`));
   // 같은 이름은 한 줄로(예: 모든 프로그램 모드에서 쓰다가 같은 프로그램을 등록한 경우)
   const apps = $derived.by(() => {
     const m = new Map<string, View["apps"][number]>();
@@ -93,7 +87,7 @@
   {:else}
     <div class="row">
       <button type="button" class="primary" onclick={() => invoke("toggle_pause")}>
-        {onBreak ? t("today.endBreak") : snap.kind === "paused" ? t("today.resume") : t("today.pause")}
+        {snap.kind === "paused" ? t("today.resume") : onBreak ? t("today.endBreak") : t("today.pause")}
       </button>
       <button type="button" class="text" onclick={() => (askReset = true)}>{t("today.reset")}</button>
       <button type="button" class="text" onclick={openMemo}>{t("today.endSession")}</button>

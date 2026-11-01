@@ -44,28 +44,48 @@
   const order: MiniSettings["show"][] = ["work", "elapsed", "both"];
   const cycle = () => mini && update({ show: order[(order.indexOf(mini.show) + 1) % 3] });
 
-  // 끌어서 옮기기: 3px 넘게 움직이면 창 끌기 시작(버튼 위에서는 안 함)
+  // 끌어서 옮기기: 6px 넘게 움직이면 창 끌기 시작(버튼 위에서는 안 함).
+  // 너무 작으면 두 번 클릭하는 사이 손이 조금만 떨려도 끌기가 시작돼 클릭이 사라진다
   let down: { x: number; y: number } | null = null;
+  let dragged = false;
   function onDown(e: PointerEvent) {
+    dragged = false;
     if (e.button !== 0 || (e.target as HTMLElement).closest("button.icon")) return;
     down = { x: e.screenX, y: e.screenY };
   }
   function onMove(e: PointerEvent) {
-    if (down && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 3) {
+    if (down && Math.hypot(e.screenX - down.x, e.screenY - down.y) > 6) {
       down = null;
+      dragged = true;
       getCurrentWindow().startDragging();
     }
   }
 
-  // 칩: 한 번 = 일시정지/재개, 두 번 = 펼치기. 두 번 누를 때 한 번이 먼저 실행되지 않게 잠깐 기다린다
+  // 클릭 수를 직접 센다. 브라우저의 dblclick은 창 끌기·창 활성화 때문에 빠질 수 있어서 쓰지 않는다
+  const DOUBLE_MS = 350;
+  let lastClick = 0;
   let clickTimer: ReturnType<typeof setTimeout> | undefined;
-  function chipClick() {
+  /** single: 한 번 눌렀을 때(두 번째 클릭이 안 오면), double: 두 번 눌렀을 때 */
+  function clicks(single: (() => void) | null, double: () => void) {
+    if (dragged) return; // 끌기가 끝난 뒤 따라오는 클릭은 무시
+    const now = Date.now();
     clearTimeout(clickTimer);
-    clickTimer = setTimeout(() => invoke("toggle_pause"), 250);
+    if (now - lastClick < DOUBLE_MS) {
+      lastClick = 0;
+      double();
+      return;
+    }
+    lastClick = now;
+    if (single) clickTimer = setTimeout(() => ((lastClick = 0), single()), DOUBLE_MS);
   }
-  function chipDouble() {
-    clearTimeout(clickTimer);
-    update({ collapsed: false });
+
+  const expand = () => update({ collapsed: false });
+  // 칩: 한 번 = 일시정지/재개, 두 번 = 펼치기
+  const chipClick = () => clicks(() => invoke("toggle_pause"), expand);
+  // 펼친 상태: 두 번 = 본창으로
+  function boxClick(e: MouseEvent) {
+    if ((e.target as HTMLElement).closest("button")) return;
+    clicks(null, () => invoke("back_to_main"));
   }
 
   const working = $derived(snap?.kind === "work");
@@ -74,19 +94,35 @@
 
 {#if snap && mini}
   {#if mini.collapsed}
-    <button
-      type="button"
-      class="chip num"
-      class:small={mini.size === "small"}
-      class:working
+    <div
+      class="chip-wrap"
       style="opacity: {mini.opacity}"
-      aria-label={working ? t("mini.chipWorking") : t("mini.chipStopped")}
-      onpointerdown={onDown}
-      onpointermove={onMove}
-      onpointerup={() => (down = null)}
-      onclick={chipClick}
-      ondblclick={chipDouble}>{hms(main)}</button
+      role="presentation"
+      onpointerenter={() => (hover = true)}
+      onpointerleave={() => ((hover = false), (down = null))}
     >
+      <button
+        type="button"
+        class="chip num"
+        class:small={mini.size === "small"}
+        class:working
+        aria-label={working ? t("mini.chipWorking") : t("mini.chipStopped")}
+        title={t("mini.chipHint")}
+        onpointerdown={onDown}
+        onpointermove={onMove}
+        onpointerup={() => (down = null)}
+        onclick={chipClick}
+        oncontextmenu={(e) => (e.preventDefault(), expand())}>{hms(main)}</button
+      >
+      <!-- 두 번 클릭은 다른 창이 앞에 있을 때 첫 클릭이 창 활성화에 쓰여 빠질 수 있어서, 한 번에 펼치는 단추를 둔다 -->
+      {#if hover}
+        <button type="button" class="icon expand" aria-label={t("mini.expand")} title={t("mini.expand")} onclick={expand}>
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+            ><path d="M14 4h6v6M10 20H4v-6M20 4l-7 7M4 20l7-7" /></svg
+          >
+        </button>
+      {/if}
+    </div>
   {:else}
     <div
       class="box"
@@ -99,7 +135,7 @@
       onpointerdown={onDown}
       onpointermove={onMove}
       onpointerup={() => (down = null)}
-      ondblclick={(e) => !(e.target as HTMLElement).closest("button") && invoke("back_to_main")}
+      onclick={boxClick}
     >
       {#if mini.show === "both"}
         <div class="line"><span class="lbl">{t("mini.work")}</span><span class="num t">{hms(snap.workMs)}</span></div>
@@ -215,6 +251,25 @@
   }
   .icon.on {
     color: var(--accent);
+  }
+  .chip-wrap {
+    position: relative;
+    width: 100vw;
+    height: 100vh;
+  }
+  .expand {
+    position: absolute;
+    top: 0;
+    right: 0;
+    height: 100%;
+    width: 24px;
+    border-radius: 0 4px 4px 0;
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.22);
+  }
+  .expand:hover {
+    color: #ffffff;
+    background: rgba(0, 0, 0, 0.35);
   }
   /* 상태 전용 색(다른 화면에는 쓰지 않음) */
   .chip {

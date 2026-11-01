@@ -1,4 +1,4 @@
-export type Kind = "work" | "other" | "idle" | "paused";
+export type Kind = "work" | "other" | "idle" | "break" | "paused";
 
 /** 막대 색. 테마 토큰 이름이라 라이트/다크에 맞춰 바뀐다. */
 export type ColorToken = "accent" | "ink" | "sub" | "idle";

@@ -100,6 +100,17 @@ impl Scheduler {
         fired
     }
 
+    /// 모든 알림을 지금 시점부터 다시 센다(휴식이 끝났을 때).
+    /// 휴식 중에도 경과는 흐르므로, 경과 기준 알림도 휴식이 끝난 뒤 N분이 지나야 울린다.
+    pub fn rearm(&mut self, alerts: &[AlertRow], session_started_ms: i64, elapsed_ms: u64, work_ms: u64) {
+        self.sync(alerts, session_started_ms, elapsed_ms, work_ms);
+        for a in alerts.iter().filter(|a| a.enabled) {
+            if let Some((_, _, anchor)) = self.seen.get_mut(&a.id) {
+                *anchor = a.basis_ms(elapsed_ms, work_ms);
+            }
+        }
+    }
+
     /// 가장 먼저 울릴 알림(기준 시간으로 남은 양)
     pub fn next_due(
         &mut self,
@@ -170,6 +181,19 @@ mod tests {
         assert_eq!(s.next_due(&alerts, 0, 90 * MIN, 0).unwrap().remaining_ms, 90 * MIN);
         assert!(s.check(&alerts, 0, 179 * MIN, 0).is_empty());
         assert_eq!(s.check(&alerts, 0, 180 * MIN, 0).len(), 1);
+    }
+
+    #[test]
+    fn rearm_after_break_counts_full_period_again() {
+        // 90분 경과 알림 → 5분 휴식(경과는 흐름) → 휴식 끝에서 다시 90분
+        let alerts = vec![alert(1, 90, "elapsed")];
+        let mut s = Scheduler::default();
+        s.check(&alerts, 0, 0, 0);
+        assert_eq!(s.check(&alerts, 0, 90 * MIN, 90 * MIN).len(), 1);
+        s.rearm(&alerts, 0, 95 * MIN, 90 * MIN);
+        assert_eq!(s.next_due(&alerts, 0, 95 * MIN, 90 * MIN).unwrap().remaining_ms, 90 * MIN);
+        assert!(s.check(&alerts, 0, 184 * MIN, 179 * MIN).is_empty());
+        assert_eq!(s.check(&alerts, 0, 185 * MIN, 180 * MIN).len(), 1);
     }
 
     #[test]

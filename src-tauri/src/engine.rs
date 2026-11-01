@@ -19,6 +19,8 @@ pub enum Kind {
     Other,
     /// 자리 비움
     Idle,
+    /// 알림 뒤 자동 휴식: 경과는 흐르고 실 작업은 세지 않는다
+    Break,
     Paused,
 }
 
@@ -28,6 +30,7 @@ impl Kind {
             Kind::Work => "work",
             Kind::Other => "other",
             Kind::Idle => "idle",
+            Kind::Break => "break",
             Kind::Paused => "paused",
         }
     }
@@ -130,6 +133,7 @@ pub struct Engine {
     work_ms: u64,
     apps: Vec<AppTime>,
     paused: bool,
+    on_break: bool,
     /// 직전 표본의 분류. 다음 tick까지의 구간에 적용된다.
     kind: Kind,
     app: Option<AppRef>,
@@ -146,6 +150,7 @@ impl Engine {
             work_ms: 0,
             apps: Vec::new(),
             paused: false,
+            on_break: false,
             kind: Kind::Other,
             app: None,
             last_ms: None,
@@ -280,6 +285,9 @@ impl Engine {
         if self.paused {
             self.kind = Kind::Paused;
             self.app = None;
+        } else if self.on_break {
+            self.kind = Kind::Break;
+            self.app = None;
         } else {
             (self.kind, self.app) = Self::classify(sample, cfg);
         }
@@ -293,9 +301,28 @@ impl Engine {
         if self.paused {
             self.kind = Kind::Paused;
             self.app = None;
+        } else if self.on_break {
+            self.kind = Kind::Break;
         } else {
             // 다음 tick에서 실제 상태로 다시 판정할 때까지는 대기로 둔다
             self.kind = Kind::Other;
+        }
+        iv
+    }
+
+    /// 휴식 시작/끝. 그때까지를 누적하고 다음 구간부터 적용한다.
+    /// 휴식 중에도 경과는 흐르고, 일시정지와 겹치면 일시정지가 우선한다.
+    pub fn set_break(&mut self, now_ms: i64, on: bool) -> Option<Interval> {
+        let iv = self.accrue(now_ms);
+        self.on_break = on;
+        if !self.paused {
+            if on {
+                self.kind = Kind::Break;
+                self.app = None;
+            } else {
+                // 다음 tick에서 실제 상태로 다시 판정할 때까지는 대기로 둔다
+                self.kind = Kind::Other;
+            }
         }
         iv
     }
@@ -304,9 +331,11 @@ impl Engine {
     pub fn reset(&mut self, now_ms: i64) -> Option<Interval> {
         let iv = self.accrue(now_ms);
         let prev = self.work_ms;
-        let (paused, kind, app, day) = (self.paused, self.kind, self.app.clone(), self.day.clone());
+        let (paused, on_break, kind, app, day) =
+            (self.paused, self.on_break, self.kind, self.app.clone(), self.day.clone());
         *self = Engine::new(now_ms, &day);
         self.paused = paused;
+        self.on_break = on_break;
         self.kind = kind;
         self.app = app;
         self.last_ms = Some(now_ms);
@@ -493,6 +522,40 @@ mod tests {
         let snap = e.snapshot();
         assert_eq!(snap.elapsed_ms, 5_000);
         assert_eq!(snap.work_ms, 5_000);
+    }
+
+    #[test]
+    fn break_keeps_elapsed_running_but_not_work() {
+        let c = cfg(&[]);
+        let mut e = Engine::new(0, DAY);
+        let t = run(&mut e, 0, 3, &s("a.exe", "", 0), &c);
+        let iv = e.set_break(t, true).unwrap(); // 3초 작업 후 휴식
+        assert_eq!(iv.kind, Kind::Work);
+        let t = run(&mut e, t, 5, &s("a.exe", "", 0), &c); // 휴식 중에 계속 작업해도
+        assert_eq!(e.snapshot().kind, Kind::Break);
+        e.set_break(t, false);
+        let t = run(&mut e, t, 2, &s("a.exe", "", 0), &c);
+        e.tick(t, DAY, &s("a.exe", "", 0), &c);
+        let snap = e.snapshot();
+        assert_eq!(snap.elapsed_ms, 10_000); // 휴식 5초도 경과에 들어감
+        assert_eq!(snap.work_ms, 5_000); // 휴식 전 3초 + 휴식 후 2초
+    }
+
+    #[test]
+    fn pause_during_break_stops_elapsed() {
+        let c = cfg(&[]);
+        let mut e = Engine::new(0, DAY);
+        e.tick(0, DAY, &s("a.exe", "", 0), &c);
+        e.set_break(0, true);
+        e.tick(2_000, DAY, &s("a.exe", "", 0), &c);
+        e.toggle_pause(2_000);
+        e.tick(5_000, DAY, &s("a.exe", "", 0), &c);
+        assert_eq!(e.snapshot().kind, Kind::Paused);
+        e.toggle_pause(5_000);
+        assert_eq!(e.snapshot().kind, Kind::Break);
+        e.tick(6_000, DAY, &s("a.exe", "", 0), &c);
+        assert_eq!(e.snapshot().elapsed_ms, 3_000);
+        assert_eq!(e.snapshot().work_ms, 0);
     }
 
     #[test]
