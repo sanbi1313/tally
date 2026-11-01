@@ -1,0 +1,96 @@
+/* 색 토큰은 mockup/Main.dc.html renderVals()와 DESIGN.md 비주얼 가이드 그대로 */
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 400;
+  font-display: block;
+  src: url("./assets/fonts/Pretendard-Regular.subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 500;
+  font-display: block;
+  src: url("./assets/fonts/Pretendard-Medium.subset.woff2") format("woff2");
+}
+@font-face {
+  font-family: "Pretendard";
+  font-weight: 600;
+  font-display: block;
+  src: url("./assets/fonts/Pretendard-SemiBold.subset.woff2") format("woff2");
+}
+
+:root {
+  --bg: #f3f0e8;
+  --surface: #fbf9f4;
+  --line: #dcd6c8;
+  --ink: #23211d;
+  --sub: #6f6a60;
+  --accent: #c4502c;
+  --on-accent: #ffffff;
+  --idle: #b9b3a6;
+  /* 기록 타임라인의 '대기' 구간 */
+  --idle-soft: color-mix(in srgb, var(--idle) 45%, var(--line));
+  color-scheme: light;
+}
+:root[data-theme="dark"] {
+  --bg: #191816;
+  --surface: #22211e;
+  --line: #35322d;
+  --ink: #ece8df;
+  --sub: #9c978c;
+  --accent: #e0784f;
+  --on-accent: #191816;
+  --idle: #57534c;
+  color-scheme: dark;
+}
+
+html,
+body {
+  margin: 0;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--ink);
+  font-family: "Pretendard", sans-serif;
+  font-size: 15px;
+  -webkit-font-smoothing: antialiased;
+  user-select: none;
+}
+#app {
+  height: 100%;
+}
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+/* 번들한 Pretendard는 한글 서브셋이라 일본어·중국어 글자가 없다.
+   그 언어에서는 Windows 기본 글꼴로 쓰고, 숫자만 Pretendard로 맞춘다. */
+:lang(ja) {
+  font-family: "Yu Gothic UI", "Meiryo UI", "Pretendard", sans-serif;
+}
+:lang(zh) {
+  font-family: "Microsoft YaHei UI", "Microsoft YaHei", "Pretendard", sans-serif;
+}
+.num {
+  font-family: "Pretendard", sans-serif;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: -0.01em;
+}
+/* 스크롤바: 얇게, 선 색으로 */
+::-webkit-scrollbar {
+  width: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--line);
+  border: 2px solid var(--bg);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-button {
+  display: none;
+}
