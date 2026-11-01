@@ -2,7 +2,7 @@
 import { Resvg } from "@resvg/resvg-js";
 import { readFileSync, writeFileSync, mkdirSync } from "node:fs";
 
-const src = "tally-handoff/logo";
+const src = "assets/logo";
 const out = "src-tauri/icons/tray";
 mkdirSync(out, { recursive: true });
 for (const state of ["working", "idle", "paused"]) {

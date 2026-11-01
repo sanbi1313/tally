@@ -29,8 +29,8 @@ npm run tauri build
 - [USAGE.md](USAGE.md) — 사용법(앱 안에서는 헤더의 ? 단추)
 - [BUILD.md](BUILD.md) — 빌드·실행·데이터·테스트 안내, 단계별 구현 내용
 - [i18n-review.md](i18n-review.md) — 4개 언어 번역표
-- [tally-handoff/](tally-handoff/) — 설계서(DESIGN.md), 목업, 로고 원본
+- [assets/logo/](assets/logo/) — 로고·트레이 아이콘 원본 SVG
 
 ## 라이선스
 
-글꼴 Pretendard는 SIL Open Font License 1.1([src/assets/fonts/LICENSE-Pretendard.txt](src/assets/fonts/LICENSE-Pretendard.txt)).
+[MIT](LICENSE). 글꼴 Pretendard는 SIL Open Font License 1.1([src/assets/fonts/LICENSE-Pretendard.txt](src/assets/fonts/LICENSE-Pretendard.txt)).

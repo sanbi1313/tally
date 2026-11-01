@@ -1,6 +1,7 @@
 {
   "name": "tally",
   "private": true,
+  "license": "MIT",
   "version": "0.1.0",
   "type": "module",
   "scripts": {
@@ -8,7 +9,7 @@
     "build": "vite build",
     "check": "svelte-check --tsconfig ./tsconfig.json",
     "tauri": "tauri",
-    "icons": "tauri icon tally-handoff/logo/app-icon.svg && node scripts/tray-icons.mjs"
+    "icons": "tauri icon assets/logo/app-icon.svg && node scripts/tray-icons.mjs"
   },
   "dependencies": {
     "@tauri-apps/api": "^2.12.4",

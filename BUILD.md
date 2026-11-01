@@ -66,7 +66,7 @@
   - 여는 곳: 오늘 화면 버튼 줄 오른쪽 아이콘, 헤더의 "작은 타이머로 접기"(본창은 닫고 작은 타이머만), 트레이 메뉴 "작은 타이머"(열기/닫기), 설정 › 작은 타이머 › 띄우기
 - 테마: 설정 › 테마(라이트 · 다크 · 시스템). 헤더 버튼은 지금 보이는 테마의 반대로 고정. 두 창이 같이 바뀜. 설정은 settings.json에 저장
 - 시작 프로그램: 설정 › 시작 프로그램 › "Windows 시작 시 트레이로 실행". 레지스트리 `HKCU\Software\Microsoft\Windows\CurrentVersion\Run`에 `tally.exe --tray`로 등록/해제. 포터블 exe를 옮겼다면 껐다 다시 켜야 새 위치로 등록됨
-- 아이콘: exe·설치 파일·창·트레이 모두 `tally-handoff/logo` 원본에서 만든 아이콘
+- 아이콘: exe·설치 파일·창·트레이 모두 `assets/logo` 원본에서 만든 아이콘
 
 ### 열린 질문에 대해 정한 기본값 (바꿀 수 있음)
 
@@ -237,7 +237,7 @@ Rust 테스트는 3단계 후 27개: 위에 더해 알림 스케줄러(기준별
 
 ## 아이콘 다시 만들기
 
-`tally-handoff/logo/*.svg`를 고친 뒤:
+`assets/logo/*.svg`를 고친 뒤:
 
 ```bash
 npm run icons
@@ -279,7 +279,7 @@ src-tauri/src/
   settings.rs         %APPDATA%\Tally\settings.json
   lib.rs              Tauri 명령, 트레이, 1초 폴링 루프, 자동 휴식, 단축키, 창 관리
 scripts/tray-icons.mjs  트레이 PNG 생성
-tally-handoff/        설계서·목업·로고 원본
+assets/logo/          로고·트레이 아이콘 원본 SVG
 ```
 
 ## 사용 후 수정 (2026-11-01)
