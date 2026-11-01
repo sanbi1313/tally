@@ -115,6 +115,8 @@ pub struct Snapshot {
     pub apps: Vec<AppTime>,
     /// 마지막 초기화·세션 종료 직전의 실 작업 시간
     pub prev_work_ms: Option<u64>,
+    /// 시작 버튼을 눌렀는지. 앱을 켰을 때·초기화·세션 종료 뒤에는 false(멈춘 채 기다림)
+    pub started: bool,
 }
 
 #[derive(Debug, Default)]
@@ -133,6 +135,8 @@ pub struct Engine {
     work_ms: u64,
     apps: Vec<AppTime>,
     paused: bool,
+    /// 시작 버튼을 눌러 한 번이라도 돌렸는지(멈춘 이유가 '시작 전'인지 '일시정지'인지 구분)
+    started: bool,
     on_break: bool,
     /// 직전 표본의 분류. 다음 tick까지의 구간에 적용된다.
     kind: Kind,
@@ -142,6 +146,7 @@ pub struct Engine {
 }
 
 impl Engine {
+    /// 새 세션. 저절로 세지 않고 시작(toggle_pause)을 누를 때까지 멈춰 있다.
     pub fn new(now_ms: i64, day: &str) -> Self {
         Self {
             session_started_ms: now_ms,
@@ -149,16 +154,17 @@ impl Engine {
             elapsed_ms: 0,
             work_ms: 0,
             apps: Vec::new(),
-            paused: false,
+            paused: true,
+            started: false,
             on_break: false,
-            kind: Kind::Other,
+            kind: Kind::Paused,
             app: None,
             last_ms: None,
             prev_work_ms: None,
         }
     }
 
-    /// 저장된 세션을 이어서 센다(앱을 다시 켰을 때 같은 날이면).
+    /// 저장된 세션을 이어서 센다(앱을 다시 켰을 때 같은 날이면). 이때도 시작을 눌러야 센다.
     pub fn resume(
         now_ms: i64,
         day: &str,
@@ -276,9 +282,11 @@ impl Engine {
         let interval = self.accrue(now_ms);
         let new_day = day != self.day;
         if new_day {
-            let paused = self.paused;
+            // 하루가 바뀌어도 돌고 있었으면 계속 돈다(사용자가 누른 초기화가 아니므로)
+            let (paused, started) = (self.paused, self.started);
             *self = Engine::new(now_ms, day);
             self.paused = paused;
+            self.started = started;
             self.last_ms = Some(now_ms);
         }
         let before = (self.kind, self.app.clone());
@@ -295,9 +303,13 @@ impl Engine {
         TickOut { interval, changed, new_day }
     }
 
+    /// 시작·일시정지·재개 공통
     pub fn toggle_pause(&mut self, now_ms: i64) -> Option<Interval> {
         let iv = self.accrue(now_ms);
         self.paused = !self.paused;
+        if !self.paused {
+            self.started = true;
+        }
         if self.paused {
             self.kind = Kind::Paused;
             self.app = None;
@@ -327,17 +339,12 @@ impl Engine {
         iv
     }
 
-    /// 현재 세션을 0으로 되돌린다(초기화·세션 종료 공통). 일시정지 상태는 유지.
+    /// 현재 세션을 0으로 되돌린다(초기화·세션 종료 공통). 새 세션은 시작을 누를 때까지 멈춰 있다.
     pub fn reset(&mut self, now_ms: i64) -> Option<Interval> {
         let iv = self.accrue(now_ms);
         let prev = self.work_ms;
-        let (paused, on_break, kind, app, day) =
-            (self.paused, self.on_break, self.kind, self.app.clone(), self.day.clone());
+        let day = self.day.clone();
         *self = Engine::new(now_ms, &day);
-        self.paused = paused;
-        self.on_break = on_break;
-        self.kind = kind;
-        self.app = app;
         self.last_ms = Some(now_ms);
         self.prev_work_ms = Some(prev);
         iv
@@ -359,6 +366,7 @@ impl Engine {
             day: self.day.clone(),
             apps,
             prev_work_ms: self.prev_work_ms,
+            started: self.started,
         }
     }
 }
@@ -442,6 +450,13 @@ mod tests {
         Sample { exe: Some(exe.to_string()), title: title.to_string(), idle_ms }
     }
 
+    /// 시작 버튼을 누른 엔진
+    fn running(now_ms: i64) -> Engine {
+        let mut e = Engine::new(now_ms, DAY);
+        e.toggle_pause(now_ms);
+        e
+    }
+
     /// start_ms부터 1초 간격으로 secs번 같은 표본을 넣는다
     fn run(e: &mut Engine, start_ms: i64, secs: i64, sample: &Sample, c: &Config) -> i64 {
         for i in 0..secs {
@@ -451,9 +466,38 @@ mod tests {
     }
 
     #[test]
+    fn new_engine_waits_for_start() {
+        let c = cfg(&[]);
+        let mut e = Engine::new(0, DAY);
+        let t = run(&mut e, 0, 5, &s("a.exe", "", 0), &c);
+        let snap = e.snapshot();
+        assert_eq!((snap.kind, snap.started, snap.elapsed_ms, snap.work_ms), (Kind::Paused, false, 0, 0));
+        e.toggle_pause(t);
+        assert!(e.snapshot().started);
+        let t = run(&mut e, t, 3, &s("a.exe", "", 0), &c);
+        e.tick(t, DAY, &s("a.exe", "", 0), &c);
+        assert_eq!(e.snapshot().work_ms, 3_000);
+        // 일시정지는 시작 전과 다르다(started 유지)
+        e.toggle_pause(t);
+        assert_eq!((e.snapshot().kind, e.snapshot().started), (Kind::Paused, true));
+    }
+
+    #[test]
+    fn day_change_keeps_running_state() {
+        let c = cfg(&[]);
+        let mut e = running(0);
+        e.tick(0, DAY, &s("a.exe", "", 0), &c);
+        e.tick(1_000, "2026-11-02", &s("a.exe", "", 0), &c);
+        e.tick(2_000, "2026-11-02", &s("a.exe", "", 0), &c);
+        let snap = e.snapshot();
+        assert!(snap.started);
+        assert_eq!(snap.work_ms, 1_000);
+    }
+
+    #[test]
     fn counts_only_tracked_app_as_work() {
         let c = cfg(&[("CLIPStudioPaint.exe", "클립 스튜디오", None)]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 11, &s("clipstudiopaint.exe", "", 0), &c); // 10초 작업
         let t = run(&mut e, t, 5, &s("chrome.exe", "", 0), &c); // 5초 대기
         e.tick(t, DAY, &s("chrome.exe", "", 0), &c);
@@ -468,7 +512,7 @@ mod tests {
     #[test]
     fn empty_list_means_everything_is_work() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 4, &s("notepad.exe", "", 0), &c);
         e.tick(t, DAY, &s("notepad.exe", "", 0), &c);
         let snap = e.snapshot();
@@ -481,7 +525,7 @@ mod tests {
     #[test]
     fn idle_input_stops_work_but_not_elapsed() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 3, &s("a.exe", "", 0), &c);
         let t = run(&mut e, t, 5, &s("a.exe", "", 200_000), &c);
         e.tick(t, DAY, &s("a.exe", "", 0), &c);
@@ -511,7 +555,7 @@ mod tests {
     #[test]
     fn pause_freezes_both_clocks() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 3, &s("a.exe", "", 0), &c);
         e.toggle_pause(t); // 3초 누적 후 정지
         let t = run(&mut e, t, 10, &s("a.exe", "", 0), &c);
@@ -527,7 +571,7 @@ mod tests {
     #[test]
     fn break_keeps_elapsed_running_but_not_work() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 3, &s("a.exe", "", 0), &c);
         let iv = e.set_break(t, true).unwrap(); // 3초 작업 후 휴식
         assert_eq!(iv.kind, Kind::Work);
@@ -544,7 +588,7 @@ mod tests {
     #[test]
     fn pause_during_break_stops_elapsed() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         e.tick(0, DAY, &s("a.exe", "", 0), &c);
         e.set_break(0, true);
         e.tick(2_000, DAY, &s("a.exe", "", 0), &c);
@@ -561,7 +605,7 @@ mod tests {
     #[test]
     fn long_gap_counts_as_elapsed_only() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         e.tick(0, DAY, &s("a.exe", "", 0), &c);
         let out = e.tick(60_000, DAY, &s("a.exe", "", 0), &c); // 절전 등으로 1분 건너뜀
         let snap = e.snapshot();
@@ -573,7 +617,7 @@ mod tests {
     #[test]
     fn reset_zeroes_session_and_remembers_previous() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 6, &s("a.exe", "", 0), &c);
         let iv = e.reset(t).unwrap();
         assert_eq!((iv.start_ms, iv.end_ms, iv.kind), (5_000, 6_000, Kind::Work));
@@ -582,7 +626,12 @@ mod tests {
         assert_eq!(snap.elapsed_ms, 0);
         assert_eq!(snap.prev_work_ms, Some(6_000));
         assert_eq!(snap.session_started_ms, t);
-        // 초기화 후에도 계속 센다
+        // 초기화하면 시작 전으로 돌아가 저절로 세지 않는다
+        assert_eq!((snap.kind, snap.started), (Kind::Paused, false));
+        let t = run(&mut e, t, 3, &s("a.exe", "", 0), &c);
+        assert_eq!(e.snapshot().elapsed_ms, 0);
+        // 시작을 누르면 센다
+        e.toggle_pause(t);
         let t = run(&mut e, t, 2, &s("a.exe", "", 0), &c);
         e.tick(t, DAY, &s("a.exe", "", 0), &c);
         assert_eq!(e.snapshot().work_ms, 2_000);
@@ -591,7 +640,7 @@ mod tests {
     #[test]
     fn day_change_starts_new_session() {
         let c = cfg(&[]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let t = run(&mut e, 0, 5, &s("a.exe", "", 0), &c);
         let out = e.tick(t, "2026-11-02", &s("a.exe", "", 0), &c);
         assert!(out.new_day);
@@ -605,7 +654,7 @@ mod tests {
     #[test]
     fn intervals_cover_time_and_carry_app() {
         let c = cfg(&[("a.exe", "A", None)]);
-        let mut e = Engine::new(0, DAY);
+        let mut e = running(0);
         let mut ivs = Vec::new();
         for (i, exe) in ["a.exe", "a.exe", "b.exe", "b.exe"].iter().enumerate() {
             ivs.extend(e.tick(i as i64 * 1000, DAY, &s(exe, "", 0), &c).interval);
@@ -630,6 +679,8 @@ mod tests {
         let c = cfg(&[("a.exe", "A", None)]);
         let apps = vec![AppTime { key: "id:1".into(), label: "A".into(), color: None, work_ms: 10_000 }];
         let mut e = Engine::resume(100_000, DAY, 50_000, 20_000, 10_000, apps);
+        assert!(!e.snapshot().started);
+        e.toggle_pause(100_000);
         e.tick(100_000, DAY, &s("a.exe", "", 0), &c);
         e.tick(101_000, DAY, &s("a.exe", "", 0), &c);
         let snap = e.snapshot();

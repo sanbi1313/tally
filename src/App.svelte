@@ -4,6 +4,7 @@
   import { onMount } from "svelte";
   import Onboarding from "./Onboarding.svelte";
   import Settings from "./Settings.svelte";
+  import Guide from "./Guide.svelte";
   import History from "./History.svelte";
   import Today from "./Today.svelte";
   import Tools from "./Tools.svelte";
@@ -15,7 +16,8 @@
   const toggleTheme = () => setTheme(resolved() === "dark" ? "light" : "dark");
 
   const tabs = ["today", "tools", "log", "settings"] as const;
-  let tab = $state<(typeof tabs)[number]>("today");
+  // "guide"는 탭 줄에 없고 헤더의 ? 단추로 연다
+  let tab = $state<(typeof tabs)[number] | "guide">("today");
 
   let snap = $state<View | null>(null);
   let askReset = $state(false);
@@ -69,6 +71,11 @@
           >
         {/if}
       </button>
+      <button type="button" class="icon" class:active={tab === "guide"} aria-label={t("guide.open")} title={t("guide.open")} onclick={() => (tab = tab === "guide" ? "today" : "guide")}>
+        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"
+          ><circle cx="12" cy="12" r="9" /><path d="M9.5 9.5a2.5 2.5 0 0 1 4.9.7c0 1.7-2.4 2.2-2.4 3.8" /><path d="M12 17h.01" /></svg
+        >
+      </button>
       <button type="button" class="icon" aria-label={t("mini.fold")} title={t("mini.fold")} onclick={() => invoke("fold_to_mini")}>
         <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" aria-hidden="true"
           ><rect x="4" y="14" width="16" height="5" rx="1.5" /><path d="M12 4v6M9 7.5l3 2.5 3-2.5" /></svg
@@ -84,7 +91,12 @@
 
   {#if onboarded === false}
     <main class="solo">
-      <Onboarding ondone={() => (onboarded = true)} />
+      <!-- 첫 실행 화면에서도 ? 단추로 사용법을 볼 수 있게 -->
+      {#if tab === "guide"}
+        <Guide />
+      {:else}
+        <Onboarding ondone={() => ((onboarded = true), (tab = "today"))} />
+      {/if}
     </main>
   {:else if onboarded}
     <nav>
@@ -101,6 +113,8 @@
           <Tools {snap} />
         {:else if tab === "log" && snap}
           <History today={snap.day} />
+        {:else if tab === "guide"}
+          <Guide />
         {:else if tab === "settings"}
           <Settings />
         {/if}
@@ -145,7 +159,8 @@
     color: var(--sub);
     border-radius: 6px;
   }
-  .icon:hover {
+  .icon:hover,
+  .icon.active {
     color: var(--ink);
   }
   nav {

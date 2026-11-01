@@ -25,6 +25,7 @@ npm run tauri build
 
 ## 문서
 
+- [USAGE.md](USAGE.md) — 사용법(앱 안에서는 헤더의 ? 단추)
 - [BUILD.md](BUILD.md) — 빌드·실행·데이터·테스트 안내, 단계별 구현 내용
 - [i18n-review.md](i18n-review.md) — 4개 언어 번역표
 - [tally-handoff/](tally-handoff/) — 설계서(DESIGN.md), 목업, 로고 원본

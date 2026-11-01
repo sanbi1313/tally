@@ -18,6 +18,8 @@ export interface Snapshot {
   day: string;
   apps: { key: string; label: string; color: string | null; workMs: number }[];
   prevWorkMs: number | null;
+  /** 시작을 눌렀는지(앱을 켠 뒤·초기화 뒤엔 false) */
+  started: boolean;
 }
 
 /** Rust store::AppRow */

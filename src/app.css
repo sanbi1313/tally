@@ -94,3 +94,8 @@ button:focus-visible {
 ::-webkit-scrollbar-button {
   display: none;
 }
+/* 한국어 긴 문장은 단어 중간에서 줄바꿈하지 않게(일본어·중국어는 글자 단위로 끊겨야 하므로 한국어만) */
+:lang(ko) .guide li {
+  word-break: keep-all;
+  overflow-wrap: anywhere;
+}

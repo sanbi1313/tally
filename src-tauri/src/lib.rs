@@ -130,16 +130,12 @@ impl Core {
     /// 지금 세션을 닫고 새로 연다(초기화·세션 종료). 기록은 통계에 남는다.
     fn restart_session(&self, note: Option<&str>) {
         let now = now_ms();
-        let in_break = self.brk.lock().unwrap().take().is_some();
+        // 휴식 중이었다면 휴식도 끝난다. 새 세션은 시작을 누를 때까지 멈춰 있다
+        self.brk.lock().unwrap().take();
         let mut e = self.engine.lock().unwrap();
         let iv = e.reset(now);
         let mut st = self.store.lock().unwrap();
         Self::record(&mut st, iv);
-        // 휴식 중 초기화: 휴식을 끝내고 새 세션을 바로 센다
-        if in_break {
-            let iv = e.set_break(now, false);
-            Self::record(&mut st, iv);
-        }
         let res = st.end_session(now, note).and_then(|_| st.start_session(now));
         if let Err(err) = res {
             eprintln!("세션 기록 실패: {err}");
@@ -1023,6 +1019,7 @@ fn status_text(lang: &str, view: &View) -> String {
         Kind::Other => i18n::t(lang, K::StatusOther).into(),
         Kind::Idle => i18n::t(lang, K::StatusIdle).into(),
         Kind::Break => i18n::t(lang, K::StatusBreak).into(),
+        Kind::Paused if !view.snap.started => i18n::t(lang, K::StatusReady).into(),
         Kind::Paused => i18n::t(lang, K::StatusPaused).into(),
     }
 }
@@ -1035,6 +1032,7 @@ fn fmt_hms(ms: u64) -> String {
 #[derive(Default)]
 struct TrayShown {
     kind: Option<Kind>,
+    started: bool,
     light: bool,
     tooltip: String,
 }
@@ -1046,13 +1044,18 @@ fn update_tray(app: &AppHandle, view: &View) {
     let shown = app.state::<Mutex<TrayShown>>();
     let mut shown = shown.lock().unwrap();
     let light = tracker::taskbar_is_light();
-    if shown.kind != Some(snap.kind) || shown.light != light {
+    if shown.kind != Some(snap.kind) || shown.started != snap.started || shown.light != light {
         if let Ok(img) = Image::from_bytes(tray_icon_bytes(snap.kind, light)) {
             let _ = tray.icon.set_icon(Some(img));
         }
-        let label = if snap.kind == Kind::Paused { i18n::K::TrayResume } else { i18n::K::TrayPause };
+        let label = match (snap.kind, snap.started) {
+            (Kind::Paused, false) => i18n::K::TrayStart,
+            (Kind::Paused, true) => i18n::K::TrayResume,
+            _ => i18n::K::TrayPause,
+        };
         let _ = tray.pause_item.set_text(i18n::t(&lang, label));
         shown.kind = Some(snap.kind);
+        shown.started = snap.started;
         shown.light = light;
     }
     let tooltip = format!(
