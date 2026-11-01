@@ -53,6 +53,78 @@ fn same_file(a: &Path, b: &Path) -> bool {
     }
 }
 
+// ── 구간 잘라 쓰기 ──
+// 해독·파형·자르기는 화면(WebView2)이 한다. 여기서는 원본 파일을 넘겨 주고, 잘라 낸 WAV를 저장만 한다.
+
+/// 구간 편집기로 열 수 있는 소리·영상 형식
+pub const MEDIA_EXTS: [&str; 13] =
+    ["wav", "mp3", "ogg", "oga", "opus", "m4a", "aac", "flac", "mp4", "m4v", "mov", "webm", "mkv"];
+pub const MEDIA_MAX_MB: u64 = 500;
+/// 잘라 낸 WAV 크기 상한(60초 모노 16비트 44.1kHz ≈ 5.3MB에 여유)
+const CLIP_MAX_BYTES: usize = 16 * 1024 * 1024;
+
+#[derive(Debug, PartialEq)]
+pub enum MediaError {
+    BadType,
+    TooBig,
+    Io(String),
+}
+
+/// 편집기에 넘길 원본 파일 바이트
+pub fn read_media(src: &Path) -> Result<Vec<u8>, MediaError> {
+    let ok = src
+        .extension()
+        .and_then(|e| e.to_str())
+        .is_some_and(|e| MEDIA_EXTS.contains(&e.to_lowercase().as_str()));
+    if !ok {
+        return Err(MediaError::BadType);
+    }
+    let len = std::fs::metadata(src).map_err(|e| MediaError::Io(e.to_string()))?.len();
+    if len > MEDIA_MAX_MB * 1024 * 1024 {
+        return Err(MediaError::TooBig);
+    }
+    std::fs::read(src).map_err(|e| MediaError::Io(e.to_string()))
+}
+
+/// 잘라 낸 WAV를 sounds 폴더에 "{원본 이름}.wav"로 저장하고 전체 경로를 돌려준다
+pub fn save_clip(stem: &str, wav: &[u8]) -> Result<PathBuf, MediaError> {
+    save_clip_in(&sounds_dir(), stem, wav)
+}
+
+fn save_clip_in(dir: &Path, stem: &str, wav: &[u8]) -> Result<PathBuf, MediaError> {
+    if wav.len() < 44 || &wav[0..4] != b"RIFF" || &wav[8..12] != b"WAVE" {
+        return Err(MediaError::BadType);
+    }
+    if wav.len() > CLIP_MAX_BYTES {
+        return Err(MediaError::TooBig);
+    }
+    let io = |e: std::io::Error| MediaError::Io(e.to_string());
+    std::fs::create_dir_all(dir).map_err(io)?;
+    let stem = clean_stem(stem);
+    let mut name = format!("{stem}.wav");
+    let mut n = 2;
+    while dir.join(&name).exists() {
+        if std::fs::read(dir.join(&name)).is_ok_and(|x| x == wav) {
+            return Ok(dir.join(name));
+        }
+        name = format!("{stem} ({n}).wav");
+        n += 1;
+    }
+    std::fs::write(dir.join(&name), wav).map_err(io)?;
+    Ok(dir.join(name))
+}
+
+/// 파일 이름에 못 쓰는 글자를 빼고 길이를 줄인다
+fn clean_stem(s: &str) -> String {
+    let s: String = s
+        .chars()
+        .filter(|c| !c.is_control() && !r#"\/:*?"<>|"#.contains(*c))
+        .take(60)
+        .collect();
+    let s = s.trim().trim_end_matches('.').trim();
+    if s.is_empty() { "sound".into() } else { s.into() }
+}
+
 const RATE: f32 = 44_100.0;
 
 /// 내장 소리 이름. UI 표시 이름은 프론트 번역에 있다.
@@ -169,5 +241,29 @@ mod tests {
     #[test]
     fn import_rejects_other_file_types() {
         assert_eq!(import(Path::new("C:/x/notes.txt")), Err(ImportError::BadType));
+    }
+
+    #[test]
+    fn read_media_checks_type() {
+        assert_eq!(read_media(Path::new("C:/x/notes.txt")), Err(MediaError::BadType));
+        assert!(matches!(read_media(Path::new("C:/없는/영상.MP4")), Err(MediaError::Io(_))));
+    }
+
+    #[test]
+    fn save_clip_names_and_dedupes() {
+        let dir = std::env::temp_dir().join(format!("tally-clip-{}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        let mut a = b"RIFF\0\0\0\0WAVE".to_vec();
+        a.resize(64, 1);
+        let mut b = a.clone();
+        b[50] = 2;
+        assert_eq!(save_clip_in(&dir, "a:b?", b"nope"), Err(MediaError::BadType));
+        let p1 = save_clip_in(&dir, " 노래:1? ", &a).unwrap();
+        assert_eq!(p1.file_name().unwrap(), "노래1.wav");
+        // 같은 내용이면 같은 파일, 다르면 번호
+        assert_eq!(save_clip_in(&dir, "노래1", &a).unwrap(), p1);
+        assert_eq!(save_clip_in(&dir, "노래1", &b).unwrap().file_name().unwrap(), "노래1 (2).wav");
+        assert_eq!(save_clip_in(&dir, "..", &a).unwrap().file_name().unwrap(), "sound.wav");
+        std::fs::remove_dir_all(&dir).unwrap();
     }
 }

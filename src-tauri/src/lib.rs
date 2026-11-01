@@ -380,6 +380,60 @@ fn preview_sound(sound: Option<String>, volume: f32) {
     sound::play(sound, volume);
 }
 
+fn media_err(lang: &str, e: sound::MediaError) -> String {
+    match e {
+        sound::MediaError::BadType => i18n::t(lang, i18n::K::ErrMediaType).to_string(),
+        sound::MediaError::TooBig => {
+            i18n::tf(lang, i18n::K::ErrMediaBig, &[("mb", &sound::MEDIA_MAX_MB.to_string())])
+        }
+        sound::MediaError::Io(msg) => msg,
+    }
+}
+
+/// 구간 편집기: 고른 소리·영상 파일을 그대로 넘긴다(해독은 화면이 한다)
+#[tauri::command]
+async fn read_media(core: State<'_, Core>, path: String) -> Result<tauri::ipc::Response, String> {
+    sound::read_media(std::path::Path::new(&path))
+        .map(tauri::ipc::Response::new)
+        .map_err(|e| media_err(&core.lang(), e))
+}
+
+/// 구간 편집기: 잘라 낸 WAV(본문)를 저장하고 전체 경로를 돌려준다. 이름은 x-name 헤더(URL 인코딩)
+#[tauri::command]
+async fn save_clip(core: State<'_, Core>, request: tauri::ipc::Request<'_>) -> Result<String, String> {
+    let tauri::ipc::InvokeBody::Raw(wav) = request.body() else {
+        return Err("expected raw body".into());
+    };
+    let stem = request
+        .headers()
+        .get("x-name")
+        .and_then(|v| v.to_str().ok())
+        .map(|v| percent_decode(v))
+        .unwrap_or_default();
+    sound::save_clip(&stem, wav)
+        .map(|p| p.to_string_lossy().into_owned())
+        .map_err(|e| media_err(&core.lang(), e))
+}
+
+/// encodeURIComponent 되돌리기(헤더는 ASCII만 되므로)
+fn percent_decode(s: &str) -> String {
+    let b = s.as_bytes();
+    let mut out = Vec::with_capacity(b.len());
+    let mut i = 0;
+    while i < b.len() {
+        if b[i] == b'%' && i + 2 < b.len() {
+            if let Ok(v) = u8::from_str_radix(&s[i + 1..i + 3], 16) {
+                out.push(v);
+                i += 3;
+                continue;
+            }
+        }
+        out.push(b[i]);
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
 fn notify(app: &AppHandle, title: String, body: String) {
     let _ = app.emit(ALERT_EVENT, &title);
     // 소리는 직접 내므로 Windows 알림음은 끈다
@@ -1279,6 +1333,8 @@ pub fn run() {
             quick_enable_alert,
             set_alert_sound,
             preview_sound,
+            read_media,
+            save_clip,
             get_settings,
             set_idle_minutes,
             set_shortcut,
@@ -1340,6 +1396,14 @@ pub fn run() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn percent_decode_round_trips_korean() {
+        // encodeURIComponent("노래 1%")
+        assert_eq!(percent_decode("%EB%85%B8%EB%9E%98%201%25"), "노래 1%");
+        assert_eq!(percent_decode("a%2"), "a%2");
+        assert_eq!(percent_decode("%zz"), "%zz");
+    }
 
     #[test]
     fn default_shortcuts_parse() {

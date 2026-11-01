@@ -319,3 +319,31 @@
 | guide.tools.b | 타이머(프리셋·직접 입력, 예: 25 또는 1:30), 스톱워치(랩), 알람(요일 반복, 요일을 안 고르면 한 번만).<br>작업 시간과 따로 돌고, 창을 닫아도 울립니다. | Timer (presets or custom, e.g. 25 or 1:30), stopwatch (laps), alarm (repeat by weekday; no weekday = once).<br>They run separately from work tracking and still ring when the window is closed. | タイマー（プリセット・直接入力、例: 25 または 1:30）、ストップウォッチ（ラップ）、アラーム（曜日の繰り返し、曜日を選ばなければ1回のみ）。<br>作業時間とは別に動き、ウィンドウを閉じても鳴ります。 | 计时器（预设或自定义，例：25 或 1:30）、秒表（计圈）、闹钟（按星期重复，不选星期则仅一次）。<br>与工作计时分开运行，关闭窗口也会响。 |
 | guide.log.t | 기록 | History | 記録 | 记录 |
 | guide.log.b | 일/주/월/연을 바꾸고 ◀ ▶로 과거로 이동합니다. 가운데 날짜를 누르면 날짜를 직접 고를 수 있어요.<br>막대나 날짜를 누르면 한 단계 아래(연 → 월 → 일)로 내려갑니다.<br>하루 보기에서 세션 메모를 눌러 고칠 수 있고, 아래 "CSV 내보내기"로 보고 있는 기간을 저장합니다. | Switch Day/Week/Month/Year and use ◀ ▶ to go back in time. Click the date in the middle to pick one.<br>Click a bar or a date to go one level down (Year → Month → Day).<br>In the day view, click a session note to edit it. "Export CSV" saves the period you are viewing. | 日/週/月/年を切り替え、◀ ▶ で過去に移動します。中央の日付を押すと日付を直接選べます。<br>棒や日付を押すと1段階下（年 → 月 → 日）に移ります。<br>日の表示ではセッションのメモを押して修正でき、「CSV 書き出し」で表示中の期間を保存します。 | 切换 日/周/月/年，用 ◀ ▶ 查看过去。点击中间的日期可以直接选择日期。<br>点击柱条或日期会进入下一级（年 → 月 → 日）。<br>在日视图中点击会话备注即可修改，“导出 CSV”会保存当前查看的时间段。 |
+
+## 알림음 구간 편집 (2026-11-01 추가·적용)
+
+| 키 | 한국어 | English | 日本語 | 中文(简体) |
+| --- | --- | --- | --- | --- |
+| sound.fileFilter (바꿈) | 소리·영상 | Audio & video | 音声・動画 | 音频和视频 |
+| clip.title | 알림음 만들기 | Make an alert sound | 通知音を作る | 制作提示音 |
+| clip.loading | 파일 읽는 중… | Reading the file… | ファイルを読み込み中… | 正在读取文件… |
+| clip.errRead | 이 파일에서 소리를 읽을 수 없어요 | Couldn't read audio from this file | このファイルから音声を読み込めません | 无法读取此文件中的音频 |
+| clip.errLong | {min}분 이하 파일만 편집할 수 있어요 | Only files up to {min} min can be edited | 編集できるのは{min}分以内のファイルです | 只能编辑 {min} 分钟以内的文件 |
+| clip.close | 닫기 | Close | 閉じる | 关闭 |
+| clip.hint | 끌어서 구간 선택 · 휠로 확대 · Shift+휠로 이동 | Drag to select · Wheel to zoom · Shift+wheel to scroll | ドラッグで範囲選択・ホイールで拡大・Shift+ホイールで移動 | 拖动选择片段 · 滚轮缩放 · Shift+滚轮平移 |
+| clip.zoomIn | 확대 | Zoom in | 拡大 | 放大 |
+| clip.zoomOut | 축소 | Zoom out | 縮小 | 缩小 |
+| clip.fitSel | 구간 보기 | Fit selection | 範囲を表示 | 显示选区 |
+| clip.fitAll | 전체 보기 | Show all | 全体を表示 | 显示全部 |
+| clip.start | 시작 | Start | 開始 | 开始 |
+| clip.end | 끝 | End | 終了 | 结束 |
+| clip.length | {sec}초 (최대 {max}초) | {sec} s (max {max} s) | {sec}秒（最大{max}秒） | {sec} 秒（最长 {max} 秒） |
+| clip.play | ▶ 들어보기 | ▶ Preview | ▶ 試聴 | ▶ 试听 |
+| clip.stop | ■ 멈춤 | ■ Stop | ■ 停止 | ■ 停止 |
+| clip.fade | 앞뒤 부드럽게 | Fade in/out | フェードイン・アウト | 淡入淡出 |
+| clip.cancel | 취소 | Cancel | キャンセル | 取消 |
+| clip.save | 저장 | Save | 保存 | 保存 |
+| clip.saving | 저장 중… | Saving… | 保存中… | 正在保存… |
+| ErrMediaType (Rust) | 소리나 영상 파일만 열 수 있어요 | Only audio or video files can be opened | 音声または動画ファイルのみ開けます | 只能打开音频或视频文件 |
+| ErrMediaBig (Rust) | {mb}MB 이하 파일만 열 수 있어요 | Only files up to {mb} MB can be opened | {mb}MB 以下のファイルのみ開けます | 只能打开 {mb}MB 以下的文件 |
+| guide.alerts.b (덧붙임) | 소리 목록의 "파일에서 고르기…"로 mp3나 영상 파일을 열면 파형에서 원하는 구간(최대 60초)만 잘라 알림음으로 쓸 수 있어요. | Pick "Choose a file…" in a sound list to open an mp3 or video file and cut the part you want (up to 60 s) from its waveform as an alert sound. | 音のリストで「ファイルから選ぶ…」からmp3や動画ファイルを開くと、波形から好きな範囲（最大60秒）だけ切り取って通知音にできます。 | 在声音列表中点“从文件选择…”打开 mp3 或视频文件，可在波形上截取想要的片段（最长 60 秒）作为提示音。 |
